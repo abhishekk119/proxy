@@ -5,6 +5,9 @@ const fetch = (...args) =>
 exports.handler = async (event) => {
   try {
     const response = await fetch("https://zenquotes.io/api/image");
+
+    // Get the content type from the ZenQuotes response
+    const contentType = response.headers.get("content-type") || "image/jpeg";
     const imageData = await response.text();
 
     return {
@@ -13,8 +16,7 @@ exports.handler = async (event) => {
       headers: {
         "Access-Control-Allow-Origin": "*",
         "Access-Control-Allow-Headers": "Content-Type",
-        "Access-Control-Allow-Methods": "GET, OPTIONS",
-        "Content-Type": "text/plain",
+        "Content-Type": contentType, // Use the correct content type
       },
     };
   } catch (error) {
