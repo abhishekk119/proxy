@@ -1,32 +1,53 @@
 // netlify/functions/zenquotes-proxy.js
-const fetch = (...args) =>
-  import("node-fetch").then(({ default: fetch }) => fetch(...args));
 
-exports.handler = async (event) => {
+exports.handler = async function (event, context) {
   try {
-    const response = await fetch("https://zenquotes.io/api/image");
+    // Fetch the image from ZenQuotes
+    const response = await fetch("https://zenquotes.io/api/image", {
+      headers: {
+        Accept: "image/jpeg,image/*,*/*",
+      },
+    });
 
-    // Get the content type from the ZenQuotes response
+    if (!response.ok) {
+      throw new Error(
+        `ZenQuotes API responded with status: ${response.status}`
+      );
+    }
+
+    // Get the image as ArrayBuffer to preserve binary data
+    const arrayBuffer = await response.arrayBuffer();
+
+    // Get the content type from the original response
     const contentType = response.headers.get("content-type") || "image/jpeg";
-    const imageData = await response.text();
+
+    // Convert to base64 for proper transmission through API Gateway
+    const base64Data = Buffer.from(arrayBuffer).toString("base64");
 
     return {
       statusCode: 200,
-      body: imageData,
       headers: {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Headers": "Content-Type",
-        "Content-Type": contentType, // Use the correct content type
+        "Content-Type": contentType,
+        "Cache-Control": "public, max-age=3600", // Cache for 1 hour
+        "Access-Control-Allow-Origin": "*", // Allow CORS
+        "Access-Control-Allow-Headers": "Content-Type, Accept",
       },
+      body: base64Data,
+      isBase64Encoded: true, // This is CRITICAL for binary data
     };
   } catch (error) {
+    console.error("Proxy error:", error);
+
     return {
       statusCode: 500,
-      body: JSON.stringify({ error: "Failed to fetch image" }),
       headers: {
-        "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*",
       },
+      body: JSON.stringify({
+        error: "Failed to fetch image",
+        message: error.message,
+      }),
     };
   }
 };
